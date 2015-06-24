@@ -8,47 +8,13 @@
             [datascript.core :as dc]
             [datascript.btset]))
 
-;; RANDOM API
-(defservantfn passthru [x]
-  x)
+;; test fns
 
-(defservantfn increment [n]
-  (inc n))
+(defservantfn passthru [& args]
+  args)
 
 
-(defn in-order? [order xs]
-  (or (empty? xs)
-      (apply order xs)))
-
-(defn bogosort* [xs]
-  (if (in-order? < xs) xs
-      (recur (shuffle xs))))
-
-(defservantfn bogosort [xs]
-  (clj->js (bogosort* xs)))
-
-(defn prime? [i]
-  (cond (< i 4)           (>= i 2)
-        (zero? (rem i 2)) false
-        :else (not-any? #(zero? (rem i %)) (range 3 (inc (.sqrt js/Math i))))))
-
-(defn mersenne? [p] (or (= p 2)
-                        (let [mp   (dec (bit-shift-left 1 p))]
-                          (loop [n 3 s 4]
-                            (if (> n p)
-                              (zero? s)
-                              (recur (inc n) (rem (- (* s s) 2) mp)))))))
-
-(defservantfn m-primes [n]
-  (vec (take n (filter mersenne? (filter prime? (iterate inc 1))))))
-
-
-;; Datascript setup
-
-(def conn
-  (let [schema {:aka {:db/cardinality :db.cardinality/many}}
-        conn   (d/create-conn schema)]
-    conn))
+;; Datascript transit handlers
 
 (deftype DatomHandler []
   Object
@@ -78,28 +44,10 @@
               "datascript/DB" (fn [{:strs [datoms schema]}]
                                 (d/init-db datoms schema))}}))
 
+;; Datascript API stuff
 
-(defservantfn bootstrap-conn! [db]
-  (reset! conn db))
-
-(defservantfn q [q-form]
-  (d/q q-form @conn))
-
-(defservantfn foreign-q [q-form db]
-  (d/q q-form db))
-
-(defservantfn transact! [data & [db-after?]]
-  (if db-after?
-    (:db-after (d/transact! conn data))
-    (do
-      (d/transact! conn data)
-      :apparent-success)))
-
-(defservantfn transact-async [data]
-  (d/transact-async conn data)
-  :apparent-success)
-
-
+(defservantfn q [q-form db & args]
+  (apply d/q q-form db args))
 
 ;; transit codec
 (defn decode-message [event]
