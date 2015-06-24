@@ -41,13 +41,13 @@
               "datascript/DB" (fn [{:strs [datoms schema]}]
                                 (d/init-db datoms schema))}}))
 
+
 (defn transit-message [worker fn-key args]
   (let [args (t/write ds-writer args)]
     (.postMessage worker (js-obj "command" "channel-transit" "fn" fn-key "args" args))))
 
 (defn servant-thread-transit-with-key [servant-channel post-message-fn fn-key & args]
-  (let [r (t/reader :json)
-        out-channel (chan 1 (map (partial t/read ds-reader)))]
+  (let [out-channel (chan 1 (map (partial t/read ds-reader)))]
     (go
       (let [worker (<! servant-channel)]
         (post-message-fn worker (pr-str fn-key) args)
@@ -60,7 +60,7 @@
     out-channel))
 
 
-(defonce worker-count 1)
+(defonce worker-count 4)
 (defonce worker-script "js/compiled/worky_worker.js")
 (defonce servant-channel (servant/spawn-servants worker-count worker-script))
 
@@ -71,85 +71,50 @@
          fn-key
          args))
 
-(defn print-answer [fn-key & args]
-  (let [result-channel (result-chan
+(defn run
+  "returns the result-channel with the result of (apply fn args)"
+  [fn-key & args]
+  (result-chan fn-key args))
+
+(defn run-with-response-fn
+  "passes result to a fn"
+  [response-fn fn-key & args]
+  (let [result-channel (apply
+                        run
                         fn-key
                         args)]
     (go
-      (let [answer (<! result-channel)]
-        (print answer)))))
+      (let [response (<! result-channel)]
+        (response-fn response)))))
 
-(defn use-answer [answer-fn fn-key & args]
-  (let [result-channel (result-chan
-                        fn-key
-                        args)]
-    (go
-      (let [answer (<! result-channel)]
-        (answer-fn answer)))))
+(defn print-response
+  "prints the response"
+  [fn-key & args]
+  (apply run-with-response-fn print fn-key args))
 
+;; Datascript API stuff
 
-(defn bootstrap-conn! []
-  (let [new-db @(d/create-conn {:aka {:db/cardinality :db.cardinality/many}})]
-    (print-answer :bootstrap-conn! new-db)))
-
-(defn primes [n]
-  (print-answer :m-primes n))
-
-(defn q [q-form]
-  (print-answer :q q-form))
-
-(defn foreign-q [q-form db]
-  (print-answer :foreign-q q-form db))
+(defn q
+  "returns a channel with the result of query"
+  [q-form db & args]
+  (apply run :q q-form db args))
 
 
-(defn transact! [data]
-  (print-answer :transact! data))
 
-(defn transact-async [data]
-  (print-answer :transact-async data))
+;; some test fns
+#_(defn test-q []
+  (print-response
+   :q '[:find  ?n ?a
+        :where [?e :aka "Maks Otto von Stirlitz"]
+        [?e :name ?n]
+        [?e :age  ?a]]
+   (:db-after (d/with (d/empty-db {:aka {:db/cardinality :db.cardinality/many}})
+                      [ { :db/id -1
+                         :name  "Maksim"
+                         :age   45
+                         :aka   ["Maks Otto von Stirlitz", "Jack Ryan"] } ])
+              :eavt)))
 
-
-;; Some stuff to play with
-
-(defn- rand-char-str []
-  (char (+ (rand-int 26) 65)))
-
-(defn- rand-str []
-  (apply str (repeatedly (+ 3 (rand-int 7)) rand-char-str)))
-
-(defn- many-peeps [n]
-  (into []
-        (for [i (range n)]
-          {:name (rand-str)
-           :age (rand-int 100)
-           :aka [(rand-str) (rand-str)]})))
-
-(defn transact-shitload []
-  (transact! (many-peeps 10000)))
-
-(defn transact-one []
-  (transact!
-   [ { :db/id -1
-      :name  "Maksim"
-      :age   45
-      :aka   ["Maks Otto von Stirlitz", "Jack Ryan"] } ]))
-
-(defn q-one []
-  (q '[ :find  ?n ?a
-       :where [?e :aka "Maks Otto von Stirlitz"]
-       [?e :name ?n]
-       [?e :age  ?a]]))
-
-(defn q-eids []
-  (q '[:find ?e
-       :where
-       [?e :name]]))
-
-(defn q-foreign []
-  (let [db (-> (d/empty-db {:aka {:db/cardinality :db.cardinality/many}})
-               (d/with (many-peeps 10000))
-               :db-after)]
-    (foreign-q '[:find (count ?e) . :where [?e :name]] db)))
 
 
 (defn on-js-reload []
