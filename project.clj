@@ -1,6 +1,6 @@
 (defproject worky "0.1.0-SNAPSHOT"
-  :description "FIXME: write this!"
-  :url "http://example.com/FIXME"
+  :description "Playing with servant and datascript"
+  :url "https://github.com/milt/worky"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
 
@@ -20,8 +20,8 @@
   :plugins [[lein-cljsbuild "1.0.6"]
             [lein-figwheel "0.3.3"]]
 
-  :source-paths ["src"]
-
+  :source-paths ["src/main" "src/common"]
+  :resource-paths ["resources"]
   :clean-targets ^{:protect false} ["resources/public/js/compiled" "target"]
 
   :cljsbuild {:builds [{:id "dev"
