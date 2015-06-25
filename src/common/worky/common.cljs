@@ -24,6 +24,7 @@
   (t/writer :json
             {:handlers
              {datascript.core/DB (DBHandler.)
+              datascript.core/FilteredDB (DBHandler.)
               datascript.core/Datom (DatomHandler.)
               datascript.btset/BTSetIter (t/VectorHandler.)}}))
 
