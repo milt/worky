@@ -19,8 +19,10 @@
      ]
     :cljs
     [
-     (enable-console-print!)
+     ;(enable-console-print!)
 
+     (defonce kill-servants ;heh
+       servant/kill-servants)
 
      (defn transit-message [worker fn-key args]
        (let [args (t/write ds-writer args)]
@@ -84,7 +86,9 @@
 
 
      ;; some test fns
-     (defn test-q []
+     (defn test-q
+       "send a db and a query to the worker, then print it. enable console print first!"
+       []
        (let [servant-channel (spawn-servants 1)]
          (print-response
           servant-channel
