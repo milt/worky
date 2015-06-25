@@ -89,22 +89,28 @@
 
 
      ;; some test fns
-     (defn test-q
+     #_(defn test-q
        "send a db and a query to the worker, then print it. enable console print first!"
        []
-       (let [servant-channel (spawn-servants 1)]
-         (print-response
-          servant-channel
-          :q '[:find  ?n ?a
-               :where [?e :aka "Maks Otto von Stirlitz"]
-               [?e :name ?n]
-               [?e :age  ?a]]
-          (:db-after (d/with (d/empty-db {:aka {:db/cardinality :db.cardinality/many}})
-                             [ { :db/id -1
-                                :name  "Maksim"
-                                :age   45
-                                :aka   ["Maks Otto von Stirlitz", "Jack Ryan"] } ])
-                     :eavt))))
+       (let [servant-channel (spawn-servants 1)
+             ;; async fns like reduce and merge won't run until a channel closes!
+             result-channel (async/reduce conj []
+                                          (async/merge [(run
+                                              servant-channel
+                                              :q '[:find  ?n ?a
+                                                   :where [?e :aka "Maks Otto von Stirlitz"]
+                                                   [?e :name ?n]
+                                                   [?e :age  ?a]
+                                                   ]
+                                              (:db-after (d/with (d/empty-db {:aka {:db/cardinality :db.cardinality/many}})
+                                                                 [ { :db/id -1
+                                                                    :name  "Maksim"
+                                                                    :age   45
+                                                                    :aka   ["Maks Otto von Stirlitz", "Jack Ryan"] } ])
+                                                         :eavt))]))]
+         (go
+           (let [result (<! result-channel)]
+             (print result)))))
 
 
 
