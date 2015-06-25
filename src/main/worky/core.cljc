@@ -6,7 +6,7 @@
                (:require [worky.common :refer [ds-writer ds-reader]]
                          [servant.core :as servant]
                          [servant.worker :refer [worker-fn-map]]
-                         [cljs.core.async :as async :refer (<! >! put! chan pub sub tap mult)]
+                         [cljs.core.async :as async :refer (<! >! put! chan pub sub tap mult close!)]
                          [cognitect.transit :as t]
                          [cljs.reader :as reader]
                          [datascript :as d])]))
@@ -37,8 +37,11 @@
              (.addEventListener worker "message"
                                 #(go
                                    (>! out-channel (.-data %1))
+                                   (close! out-channel)
                                    ;; return the worker back to the servant-channel
-                                   (>! servant-channel worker)))))
+                                   ;; or terminate if the channel is closed
+                                   (when-not (>! servant-channel worker)
+                                     (.terminate worker))))))
          out-channel))
 
 
