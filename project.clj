@@ -24,9 +24,8 @@
 
   :clean-targets ^{:protect false} ["resources/public/js/compiled" "target"]
 
-  :cljsbuild {
-              :builds [{:id "dev"
-                        :source-paths ["src"]
+  :cljsbuild {:builds [{:id "dev"
+                        :source-paths ["src/main" "src/common"]
 
                         :figwheel { :on-jsload "worky.core/on-js-reload" }
 
@@ -37,10 +36,10 @@
                                    :source-map-timestamp true }}
 
                        {:id "worker"
-                        :source-paths ["wksrc"]
+                        :source-paths ["src/worker" "src/common"]
 
                         :compiler {:main worky.worker
-                                   :output-to "resources/public/js/compiled/worky_worker.js"
+                                   :output-to "resources/js/compiled/worky_worker.js"
                                    :optimizations :advanced
                                    :pretty-print false}}
                        {:id "min"
@@ -78,4 +77,5 @@
 
              ;; to configure a different figwheel logfile path
              ;; :server-logfile "tmp/logs/figwheel-logfile.log"
-             })
+             }
+  :aliases {"figwheel" ["do" "clean," "cljsbuild" "once" "worker," "figwheel"]})
