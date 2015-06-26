@@ -28,24 +28,47 @@
        (let [args (t/write ds-writer args)]
          (.postMessage worker (js-obj "command" "channel-transit" "fn" fn-key "args" args))))
 
+     (defn- clean-up-listeners [worker]
+       (doto worker
+         (.removeEventListener "error")
+         (.removeEventListener "message")))
+
      (defn servant-thread-transit-with-key [servant-channel post-message-fn fn-key & args]
-       (let [out-channel (chan 1 (map (partial t/read ds-reader)))]
+       (let [out-channel (chan 1)]
          (go
            (let [worker (<! servant-channel)]
-             (post-message-fn worker (pr-str fn-key) args)
+             (post-message-fn
+              (doto worker
+                (.addEventListener "error"
+                                   #(go
+                                      (doto out-channel
+                                        (>! :worky/error-result)
+                                        close!)
+                                      (when-not (>! servant-channel (clean-up-listeners worker)) ;; back in the pool!
+                                        (.terminate worker))
+                                      (.error js/console %)))
+                (.addEventListener "message"
+                                   #(go
+                                      (let [result (or (t/read ds-reader (.-data %1)) :worky/nil-result)]
+                                        (doto out-channel
+                                          (>! result)
+                                          close!)
+
+                                        ;; return the worker back to the servant-channel
+                                        ;; or terminate if the channel is closed
+                                        (when-not (>! servant-channel (clean-up-listeners worker))
+                                          (.terminate worker))))))
+              (pr-str fn-key) args)
              ;; Add an event listener for the worker
-             (.addEventListener worker "message"
-                                #(go
-                                   (>! out-channel (.-data %1))
-                                   (close! out-channel)
-                                   ;; return the worker back to the servant-channel
-                                   ;; or terminate if the channel is closed
-                                   (when-not (>! servant-channel worker)
-                                     (.terminate worker))))))
+             ))
          out-channel))
 
 
      (defonce worker-blob (js/Blob. #js [(slurp-worker)] (js-obj "type" "application/javascript")))
+
+     (defn spawn-servant [& [path-or-blob]]
+       (js/Worker. (or path-or-blob
+                       (.createObjectURL js/URL worker-blob))))
 
      (defn spawn-servants [worker-count & [path-or-blob]]
        (servant/spawn-servants worker-count (or path-or-blob
