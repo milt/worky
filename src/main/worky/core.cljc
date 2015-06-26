@@ -89,6 +89,18 @@
 
 
      ;; some test fns
+     #_(defn test-nil []
+       (let [servant-channel (spawn-servants 1)
+             result-channel (run servant-channel :nil-result)]
+         (go
+           (let [result (<! result-channel)]
+             (print result)))))
+     #_(defn test-error []
+       (let [servant-channel (spawn-servants 1)
+             result-channel (run servant-channel :throw-error)]
+         (go
+           (let [result (<! result-channel)]
+             (print result)))))
      #_(defn test-q
        "send a db and a query to the worker, then print it. enable console print first!"
        []
