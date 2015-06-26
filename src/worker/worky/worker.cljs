@@ -13,9 +13,17 @@
 (defservantfn passthru [& args]
   args)
 
+(defservantfn nil-result [_]
+  nil)
+
+(defservantfn throw-error [_]
+  (throw (js/Error. "Test Error")))
+
 ;; Datascript API stuff
 
-(defservantfn q [q-form db & args]
+(defservantfn q
+  "runs a datalog query on arbitrary input data"
+  [q-form db & args]
   (apply d/q q-form db args))
 
 ;; transit codec
