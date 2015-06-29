@@ -30,37 +30,34 @@
 
      (defn- clean-up-listeners [worker]
        (doto worker
-         (.removeEventListener "error")
-         (.removeEventListener "message")))
+         (aset "onerror" nil)
+         (aset "onmessage" nil)))
 
      (defn servant-thread-transit-with-key [servant-channel post-message-fn fn-key & args]
        (let [out-channel (chan 1)]
          (go
            (let [worker (<! servant-channel)]
-             (post-message-fn
-              (doto worker
-                (.addEventListener "error"
-                                   #(go
-                                      (doto out-channel
-                                        (>! :worky/error-result)
-                                        close!)
-                                      (when-not (>! servant-channel (clean-up-listeners worker)) ;; back in the pool!
-                                        (.terminate worker))
-                                      (.error js/console %)))
-                (.addEventListener "message"
-                                   #(go
-                                      (let [result (or (t/read ds-reader (.-data %1)) :worky/nil-result)]
-                                        (doto out-channel
-                                          (>! result)
-                                          close!)
+             (doto worker
+               (aset "onerror"
+                      #(go
+                         (doto out-channel
+                           (>! :worky/error-result)
+                           close!)
+                         (when-not (>! servant-channel (clean-up-listeners worker)) ;; back in the pool!
+                            (.terminate worker))
+                         (.error js/console %)))
+               (aset "onmessage"
+                     #(let [result (or (t/read ds-reader (.-data %1)) :worky/nil-result)]
+                        (go
+                          (doto out-channel
+                            (>! result)
+                            close!)
 
-                                        ;; return the worker back to the servant-channel
-                                        ;; or terminate if the channel is closed
-                                        (when-not (>! servant-channel (clean-up-listeners worker))
-                                          (.terminate worker))))))
-              (pr-str fn-key) args)
-             ;; Add an event listener for the worker
-             ))
+                          ;; return the worker back to the servant-channel
+                          ;; or terminate if the channel is closed
+                          (when-not (>! servant-channel (clean-up-listeners worker))
+                            (.terminate worker)))))
+               (post-message-fn (pr-str fn-key) args))))
          out-channel))
 
 
