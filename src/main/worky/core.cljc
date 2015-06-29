@@ -19,7 +19,7 @@
      ]
     :cljs
     [
-     ;(enable-console-print!)
+     #_(enable-console-print!)
 
      (defonce kill-servants ;heh
        servant/kill-servants)
@@ -110,8 +110,80 @@
        [servant-channel q-form db & args]
        (apply run servant-channel :q q-form db args))
 
+     (defn empty-db [servant-channel & [schema]]
+       (run servant-channel :empty-db schema))
+
+     (defn init-db [servant-channel datoms & [schema]]
+       (run servant-channel :init-db datoms schema))
+
+     (defn db [servant-channel]
+       (run servant-channel :db))
+
+     (defn datoms [servant-channel index & components]
+       (apply run servant-channel :datoms index components))
+
+     (defn transact! [servant-channel data]
+       (run servant-channel :transact! data))
+
+     (defn transact-async [servant-channel data]
+       (run servant-channel :transact-async data))
+
+     (defn q-worker [servant-channel q-form & args]
+       (apply run servant-channel :q-worker q-form args))
+
+     (defn pull
+       ([servant-channel pattern eid]
+        (run servant-channel :pull pattern eid))
+       ([servant-channel db pattern eid]
+        (run servant-channel :pull db pattern eid)))
+
+     (defn pull-many
+       ([servant-channel pattern eids]
+        (run servant-channel :pull-many pattern eids))
+       ([servant-channel db pattern eids]
+        (run servant-channel :pull-many db pattern eids)))
+
+     (defn entity
+       ([servant-channel eid]
+        (run servant-channel :entity eid))
+       ([servant-channel db eid]
+        (run servant-channel :entity db eid)))
+
 
      ;; some test fns
+     #_(defn test-internal-state []
+       (let [sc (spawn-servants 1)
+
+             r1 (empty-db sc {:name  { :db/unique :db.unique/identity }
+                           :aka {:db/cardinality :db.cardinality/many}})
+             r2 (transact! sc [ { :db/id -1
+                              :name  "Maksim"
+                              :age   45
+                              :aka   ["Maks Otto von Stirlitz", "Jack Ryan"] } ])
+             r3 (q-worker sc '[:find  ?n ?a
+                            :where [?e :aka "Maks Otto von Stirlitz"]
+                            [?e :name ?n]
+                            [?e :age  ?a]
+                            ])
+             r4 (run sc :pull '[*] [:name "Maksim"])
+
+             r5 (run sc :pull '[:age] [:name "Maksim"])
+
+             r6 (q-worker sc '[:find  ?n .
+                               :where [?e :aka "Maks Otto von Stirlitz"]
+                               [?e :name ?n]
+                               ])
+             ]
+         (go
+           (print (<! r1))
+           (print (<! r2))
+           (print (<! r3))
+           (print (<! r4))
+           (print (<! r5))
+           (print (<! r6))
+           )
+         (servant/kill-servants sc 1)))
+
      #_(defn test-nil []
        (let [servant-channel (spawn-servants 1)
              result-channel (run servant-channel :nil-result)]
